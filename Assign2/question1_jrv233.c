@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 void clearBuffer(int *bufferPtr);
 bool createdSequence1(int buffer[]);
@@ -16,6 +17,7 @@ struct arguments {
     int val;
     int bufferIndex;
     int *buffer;
+    int *count;
     int numCorrect;
 };
 
@@ -31,6 +33,7 @@ int main(int argc, char *argv){
     pthread_t thread1;
     pthread_t thread2;
     int buffer[3] = {0,1,0};
+    int count = 0;
     //Make array of three arguments
     int size = 3;
     struct arguments *threadArgs[3];
@@ -44,6 +47,7 @@ int main(int argc, char *argv){
         //Don't use a ++ here! increments i
         threadArgs[i]->val = i + 1;
         threadArgs[i]->buffer = buffer;
+        threadArgs[i]->count = &count;
         //threadArgs[i]->bufferIndex = 0;
         printArg(threadArgs[i]);
     }
@@ -69,17 +73,17 @@ int main(int argc, char *argv){
     //Wait for threads to finish with join
     // Join with thread
     if (pthread_join(thread0, NULL)) {
-    fprintf(stderr,"Error while joining with child thread\n");
-    exit(1);
+        fprintf(stderr,"Error while joining with child thread\n");
+        exit(1);
     }
     if (pthread_join(thread1, NULL)) {
-    fprintf(stderr,"Error while joining with child thread\n");
-    exit(1);
+        fprintf(stderr,"Error while joining with child thread\n");
+        exit(1);
     }
     // Join with thread
     if (pthread_join(thread2, NULL)) {
-    fprintf(stderr,"Error while joining with child thread\n");
-    exit(1);
+        fprintf(stderr,"Error while joining with child thread\n");
+        exit(1);
     }
     
 }
@@ -102,16 +106,28 @@ void *do_work(void *arg){
     struct arguments *threadArgs = (struct arguments*)arg;
     pthread_mutex_t *mutex = threadArgs->mutex;
     fprintf(stderr,"Thread with val: %d\n", threadArgs->val);
+    int *count = NULL;
+    
     //Loop here while shared num sequences is < 10
-    while(threadArgs->numCorrect < 10){
+    //threadArgs->numCorrect < 10
+    while(*count < 10){
         //Critical section
         pthread_mutex_lock(mutex);
+
+        (*count)++;
+        fprintf(stderr, "Thread %d entered critical section and made count equal %d\n", threadArgs->val, *count);
+
+        if((*count) == 2){
+            fprintf(stderr, "Two achieved");
+        }
+
         //Set our position
-        arguments->
         pthread_mutex_unlock(mutex);
-        usleep(200000)
+        fprintf(stderr, "Thread %d left critical section\n", threadArgs->val);
+        usleep(200000);
 
         //Check the value of index, do we have a complete sequence?
     }
+    printf("Ten achieved in thread %d", threadArgs->val);
     return NULL;
 }
