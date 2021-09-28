@@ -5,8 +5,9 @@
 #include <unistd.h>
 
 void clearBuffer(int *bufferPtr);
-bool createdSequence1(int buffer[]);
+bool createdSequence1(int buffer1[]);
 void *do_work(void *arg);
+void *do_work2(void *arg);
 /*
  Problem 1: Generating a sequence using pthreads
 */
@@ -21,6 +22,7 @@ struct arguments
     int *count;
     int *totalCount;
     int numCorrect;
+    bool *finishedFlag;
 };
 
 void printArg(void *arguments)
@@ -36,12 +38,17 @@ int main(int argc, char *argv)
     pthread_t thread0;
     pthread_t thread1;
     pthread_t thread2;
-    int buffer[3] = {0, 0, 0};
+    pthread_t thread3;
+    pthread_t thread4;
+    pthread_t thread5;
+    int buffer1[3] = {0, 0, 0};
+    int buffer2[3] = {0, 0, 0};
     int bufferIndex = 0;
     int count = 0;
     int totalCount = 0;
+    bool finishedFlag = false;
     //Make array of three arguments
-    int size = 3;
+    int size = 6;
     struct arguments *threadArgs[3];
     int i;
     pthread_mutex_t buffer1Lock;
@@ -53,11 +60,19 @@ int main(int argc, char *argv)
         threadArgs[i]->mutex = &buffer1Lock;
         //Don't use a ++ here! increments i
         threadArgs[i]->val = i + 1;
-        threadArgs[i]->buffer = buffer;
         threadArgs[i]->bufferIndex = &bufferIndex;
         threadArgs[i]->count = &count;
         threadArgs[i]->totalCount = &totalCount;
-        printArg(threadArgs[i]);
+        threadArgs[i]->finishedFlag = &finishedFlag;
+        if (i < 3)
+        {
+            threadArgs[i]->buffer = buffer1;
+        }
+        else
+        {
+            threadArgs[i]->buffer = buffer2;
+        }
+        //printArg(threadArgs[i]);
     }
 
     //Now that we have three sets of arguments, pass them to start the threads.
@@ -111,14 +126,14 @@ void clearBuffer(int *bufferPtr)
     }
 }
 
-bool createdSequence1(int buffer[])
+bool createdSequence1(int buffer1[])
 {
-    return (buffer[0] == 1 && buffer[1] == 2 && buffer[2] == 3);
+    return (buffer1[0] == 1 && buffer1[1] == 2 && buffer1[2] == 3);
 }
 
-bool printBuffer(int buffer[])
+bool printBuffer(int buffer1[])
 {
-    fprintf(stderr, "\nBuffer: [%d,%d,%d]\n", buffer[0], buffer[1], buffer[2]);
+    fprintf(stderr, "\nBuffer: [%d,%d,%d]\n", buffer1[0], buffer1[1], buffer1[2]);
 }
 
 //bool finishedSequences(void *lock, void* count){
@@ -133,6 +148,7 @@ void *do_work(void *arg)
     //fprintf(stderr, "Thread with val: %d\n", threadArgs->val);
     int *count = threadArgs->count;
     int *totalCount = threadArgs->totalCount;
+    bool *finishedFlag = threadArgs->finishedFlag;
     int *indexPtr = NULL;
     bool createdSequence = false;
 
@@ -144,13 +160,13 @@ void *do_work(void *arg)
         pthread_mutex_lock(mutex);
         indexPtr = threadArgs->bufferIndex;
         fprintf(stderr, "My id: %d\n", tid);
-        //Set position in buffer.
+        //Set position in buffer1.
         threadArgs->buffer[*indexPtr] = threadArgs->val;
         if (*indexPtr == 2)
         {
             //Log this attempt
             *totalCount += 1;
-            //printBuffer(threadArgs->buffer);
+            //printBuffer(threadArgs->buffer1);
             createdSequence = createdSequence1(threadArgs->buffer);
             if (createdSequence)
             {
@@ -181,6 +197,61 @@ void *do_work(void *arg)
     return NULL;
 }
 
+void *do_work2(void *arg)
+{
+    struct arguments *threadArgs = (struct arguments *)arg;
+    int tid = threadArgs->val;
+    pthread_mutex_t *mutex = threadArgs->mutex;
+    //fprintf(stderr, "Thread with val: %d\n", threadArgs->val);
+    int *count = threadArgs->count;
+    int *totalCount = threadArgs->totalCount;
+    int *indexPtr = NULL;
+    bool createdSequence = false;
+
+    //Loop here while shared num sequences is < 10
+    //threadArgs->numCorrect < 10
+    while (*count < 10)
+    {
+        //Begin critical section
+        pthread_mutex_lock(mutex);
+        indexPtr = threadArgs->bufferIndex;
+        fprintf(stderr, "My id: %d\n", tid);
+        //Set position in buffer1.
+        threadArgs->buffer[*indexPtr] = threadArgs->val;
+        if (*indexPtr == 2)
+        {
+            //Log this attempt
+            *totalCount += 1;
+            //printBuffer(threadArgs->buffer1);
+            createdSequence = createdSequence1(threadArgs->buffer);
+            if (createdSequence)
+            {
+                fprintf(stderr, "123\n");
+                *count += 1;
+                //fprintf(stderr, "Count: %d\n", *count);
+                //If we get here we are done, print the final result.
+                if (*count == 10)
+                {
+                    fprintf(stderr, "Total sequences generated %d\n", *(threadArgs->totalCount));
+                    fprintf(stderr, "Number of correct sequences %d\n", *(threadArgs->count));
+                }
+            }
+            *indexPtr = 0;
+            clearBuffer(threadArgs->buffer);
+        }
+        else
+        {
+            *indexPtr += 1;
+        }
+
+        pthread_mutex_unlock(mutex);
+        //fprintf(stderr, "Thread %d left crit section with index %d\n", tid, *indexPtr);
+        //Sleep for now.
+        usleep(200000);
+    }
+
+    return NULL;
+}
 /*
 //Critical section
         pthread_mutex_lock(mutex);
