@@ -6,10 +6,11 @@
 
 void clearBuffer(int *bufferPtr);
 bool createdSequence1(int buffer1[]);
+bool createdSequence2(int buffer2[]);
 void *do_work(void *arg);
 void *do_work2(void *arg);
 /*
- Problem 1: Generating a sequence using pthreads
+ Problem 2: Threads racing problem
 */
 
 //Create argument struct
@@ -49,15 +50,18 @@ int main(int argc, char *argv)
     bool finishedFlag = false;
     //Make array of three arguments
     int size = 6;
-    struct arguments *threadArgs[3];
+    struct arguments *threadArgs[size];
     int i;
     pthread_mutex_t buffer1Lock;
+    pthread_mutex_t buffer2Lock;
     pthread_mutex_init(&buffer1Lock, NULL);
+    pthread_mutex_init(&buffer2Lock, NULL);
+
     //Initialize arguments struct
     for (i = 0; i < size; i++)
     {
         threadArgs[i] = (struct arguments *)calloc(1, sizeof(struct arguments));
-        threadArgs[i]->mutex = &buffer1Lock;
+
         //Don't use a ++ here! increments i
         threadArgs[i]->val = i + 1;
         threadArgs[i]->bufferIndex = &bufferIndex;
@@ -67,12 +71,14 @@ int main(int argc, char *argv)
         if (i < 3)
         {
             threadArgs[i]->buffer = buffer1;
+            threadArgs[i]->mutex = &buffer1Lock;
         }
         else
         {
             threadArgs[i]->buffer = buffer2;
+            threadArgs[i]->mutex = &buffer2Lock;
         }
-        //printArg(threadArgs[i]);
+        printArg(threadArgs[i]);
     }
 
     //Now that we have three sets of arguments, pass them to start the threads.
@@ -94,6 +100,24 @@ int main(int argc, char *argv)
         fprintf(stderr, "Error while creating thread\n");
         exit(1);
     }
+    /*if (pthread_create(&thread3, NULL,
+                       do_work2, (void *)threadArgs[3]))
+    {
+        fprintf(stderr, "Error while creating thread\n");
+        exit(1);
+    }
+    if (pthread_create(&thread4, NULL,
+                       do_work2, (void *)threadArgs[4]))
+    {
+        fprintf(stderr, "Error while creating thread\n");
+        exit(1);
+    }
+    if (pthread_create(&thread5, NULL,
+                       do_work2, (void *)threadArgs[5]))
+    {
+        fprintf(stderr, "Error while creating thread\n");
+        exit(1);
+    }*/
 
     //Wait for threads to finish with join
     // Join with thread
@@ -107,17 +131,31 @@ int main(int argc, char *argv)
         fprintf(stderr, "Error while joining with child thread\n");
         exit(1);
     }
-    // Join with thread
     if (pthread_join(thread2, NULL))
     {
         fprintf(stderr, "Error while joining with child thread\n");
         exit(1);
     }
+
+    /*if (pthread_join(thread3, NULL))
+    {
+        fprintf(stderr, "Error while joining with child thread\n");
+        exit(1);
+    }
+    if (pthread_join(thread4, NULL))
+    {
+        fprintf(stderr, "Error while joining with child thread\n");
+        exit(1);
+    }
+    if (pthread_join(thread5, NULL))
+    {
+        fprintf(stderr, "Error while joining with child thread\n");
+        exit(1);
+    }*/
 }
 
 void clearBuffer(int *bufferPtr)
 {
-    // printf("Val from clear_buffer: %d", bufferPtr[1]);
     int size = 3;
     for (int i = 0; i < size; i++)
     {
@@ -131,6 +169,11 @@ bool createdSequence1(int buffer1[])
     return (buffer1[0] == 1 && buffer1[1] == 2 && buffer1[2] == 3);
 }
 
+bool createdSequence2(int buffer2[])
+{
+    return (buffer2[0] == 4 && buffer2[1] == 5 && buffer2[2] == 6);
+}
+
 bool printBuffer(int buffer1[])
 {
     fprintf(stderr, "\nBuffer: [%d,%d,%d]\n", buffer1[0], buffer1[1], buffer1[2]);
@@ -142,6 +185,7 @@ bool printBuffer(int buffer1[])
 
 void *do_work(void *arg)
 {
+
     struct arguments *threadArgs = (struct arguments *)arg;
     int tid = threadArgs->val;
     pthread_mutex_t *mutex = threadArgs->mutex;
@@ -151,11 +195,13 @@ void *do_work(void *arg)
     bool *finishedFlag = threadArgs->finishedFlag;
     int *indexPtr = NULL;
     bool createdSequence = false;
+    fprintf(stderr, "\nThread %d entered do_work\n", tid);
 
     //Loop here while shared num sequences is < 10
     //threadArgs->numCorrect < 10
     while (*count < 10)
     {
+        fprintf(stderr, "\nThread %d entered do_work loop\n", tid);
         //Begin critical section
         pthread_mutex_lock(mutex);
         indexPtr = threadArgs->bufferIndex;
@@ -200,18 +246,20 @@ void *do_work(void *arg)
 void *do_work2(void *arg)
 {
     struct arguments *threadArgs = (struct arguments *)arg;
-    int tid = threadArgs->val;
-    pthread_mutex_t *mutex = threadArgs->mutex;
-    //fprintf(stderr, "Thread with val: %d\n", threadArgs->val);
     int *count = threadArgs->count;
+    pthread_mutex_t *mutex = threadArgs->mutex;
+    int tid = threadArgs->val;
+    //fprintf(stderr, "Thread with val: %d\n", threadArgs->val);
     int *totalCount = threadArgs->totalCount;
     int *indexPtr = NULL;
     bool createdSequence = false;
+    fprintf(stderr, "\nThread %d entered do_work2\n", tid);
 
     //Loop here while shared num sequences is < 10
     //threadArgs->numCorrect < 10
     while (*count < 10)
     {
+        fprintf(stderr, "\nThread %d entered do_work2 loop\n", tid);
         //Begin critical section
         pthread_mutex_lock(mutex);
         indexPtr = threadArgs->bufferIndex;
@@ -223,10 +271,10 @@ void *do_work2(void *arg)
             //Log this attempt
             *totalCount += 1;
             //printBuffer(threadArgs->buffer1);
-            createdSequence = createdSequence1(threadArgs->buffer);
+            createdSequence = createdSequence2(threadArgs->buffer);
             if (createdSequence)
             {
-                fprintf(stderr, "123\n");
+                fprintf(stderr, "456\n");
                 *count += 1;
                 //fprintf(stderr, "Count: %d\n", *count);
                 //If we get here we are done, print the final result.
