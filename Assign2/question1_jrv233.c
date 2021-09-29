@@ -20,6 +20,7 @@ struct arguments
     int *buffer;
     int *count;
     int *totalCount;
+    bool *sequenceMade;
     int numCorrect;
 };
 
@@ -36,12 +37,13 @@ int main(int argc, char *argv)
     pthread_t thread0;
     pthread_t thread1;
     pthread_t thread2;
-    int buffer[3] = {0, 1, 0};
+    int buffer[3] = {0, 0, 0};
     int bufferIndex = 0;
     int count = 0;
     int totalCount = 0;
     //Make array of three arguments
     int size = 3;
+    bool sequenceMade = false;
     struct arguments *threadArgs[3];
     int i;
     pthread_mutex_t buffer1Lock;
@@ -55,6 +57,7 @@ int main(int argc, char *argv)
         threadArgs[i]->val = i + 1;
         threadArgs[i]->buffer = buffer;
         threadArgs[i]->bufferIndex = &bufferIndex;
+        threadArgs[i]->sequenceMade = &sequenceMade;
         threadArgs[i]->count = &count;
         threadArgs[i]->totalCount = &totalCount;
         printArg(threadArgs[i]);
@@ -134,7 +137,8 @@ void *do_work(void *arg)
     int *count = threadArgs->count;
     int *totalCount = threadArgs->totalCount;
     int *indexPtr = NULL;
-    bool createdSequence = false;
+    bool madeCorrectSeq = false;
+    bool *sequenceMade = threadArgs->sequenceMade;
 
     //Loop here while shared num sequences is < 10
     //threadArgs->numCorrect < 10
@@ -150,10 +154,11 @@ void *do_work(void *arg)
         {
             //Log this attempt
             *totalCount += 1;
-            //printBuffer(threadArgs->buffer);
-            createdSequence = createdSequence1(threadArgs->buffer);
-            if (createdSequence)
+            printBuffer(threadArgs->buffer);
+            madeCorrectSeq = createdSequence1(threadArgs->buffer);
+            if (madeCorrectSeq)
             {
+
                 fprintf(stderr, "123\n");
                 *count += 1;
                 //fprintf(stderr, "Count: %d\n", *count);
@@ -175,7 +180,7 @@ void *do_work(void *arg)
         pthread_mutex_unlock(mutex);
         //fprintf(stderr, "Thread %d left crit section with index %d\n", tid, *indexPtr);
         //Sleep for now.
-        usleep(200000);
+        usleep(50000);
     }
 
     return NULL;
