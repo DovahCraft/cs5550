@@ -180,26 +180,8 @@ void *do_work(void *arg)
         pthread_mutex_unlock(mutex);
         //fprintf(stderr, "Thread %d left crit section with index %d\n", tid, *indexPtr);
         //Sleep for now.
-        usleep(50000);
+        usleep(500000);
     }
 
     return NULL;
 }
-
-/*
-//Critical section
-        pthread_mutex_lock(mutex);
-        (*count)++;
-        fprintf(stderr, "Thread %d entered critical section and made count equal %d\n", threadArgs->val, *count);
-
-        if ((*count) == 2)
-        {
-            fprintf(stderr, "Two achieved");
-        }
-
-        //Set our position
-        pthread_mutex_unlock(mutex);
-        fprintf(stderr, "Thread %d left critical section\n", threadArgs->val);
-        usleep(200000);
-
-        //Check the value of index, do we have a complete sequence?*/

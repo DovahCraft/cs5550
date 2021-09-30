@@ -33,7 +33,7 @@ void printArg(void *arguments)
     printf("Val: %d\n", threadArg->val);
     printf("bufferIndex: %d\n", *(threadArg->bufferIndex));
     printf("bufferVal: %d\n", threadArg->buffer[1]);
-    printf("numCorrect: %d\n", threadArg->numCorrect);
+    printf("numCorrect: %d\n", *(threadArg->numCorrect));
 }
 int main(int argc, char *argv)
 {
@@ -46,8 +46,11 @@ int main(int argc, char *argv)
     int buffer1[3] = {0, 0, 0};
     int buffer2[3] = {0, 0, 0};
     int bufferIndex = 0;
-    int numCorrect = 0;
-    int totalCount = 0;
+    //Num correct by each team
+    int numCorrect1 = 0;
+    int numCorrect2 = 0;
+    int totalCount1 = 0;
+    int totalCount2 = 0;
     bool finishedFlag = false;
     //Make array of three arguments
     int size = 6;
@@ -55,6 +58,7 @@ int main(int argc, char *argv)
     int i;
     pthread_mutex_t buffer1Lock;
     pthread_mutex_t buffer2Lock;
+    pthread_mutex_t buffer3Lock;
     pthread_mutex_init(&buffer1Lock, NULL);
     pthread_mutex_init(&buffer2Lock, NULL);
 
@@ -66,18 +70,19 @@ int main(int argc, char *argv)
         //Don't use a ++ here! increments i
         threadArgs[i]->val = i + 1;
         threadArgs[i]->bufferIndex = &bufferIndex;
-        threadArgs[i]->numCorrect = &numCorrect;
-        threadArgs[i]->totalCount = &totalCount;
+        threadArgs[i]->numCorrect = &numCorrect1;
         threadArgs[i]->finishedFlag = &finishedFlag;
         if (i < 3)
         {
             threadArgs[i]->buffer = buffer1;
             threadArgs[i]->mutex = &buffer1Lock;
+            threadArgs[i]->totalCount = &totalCount1;
         }
         else
         {
             threadArgs[i]->buffer = buffer2;
             threadArgs[i]->mutex = &buffer2Lock;
+            threadArgs[i]->totalCount = &totalCount2;
         }
         printArg(threadArgs[i]);
     }
@@ -101,7 +106,7 @@ int main(int argc, char *argv)
         fprintf(stderr, "Error while creating thread\n");
         exit(1);
     }
-    /*if (pthread_create(&thread3, NULL,
+    if (pthread_create(&thread3, NULL,
                        do_work2, (void *)threadArgs[3]))
     {
         fprintf(stderr, "Error while creating thread\n");
@@ -118,7 +123,7 @@ int main(int argc, char *argv)
     {
         fprintf(stderr, "Error while creating thread\n");
         exit(1);
-    }*/
+    }
 
     //Wait for threads to finish with join
     // Join with thread
@@ -138,7 +143,7 @@ int main(int argc, char *argv)
         exit(1);
     }
 
-    /*if (pthread_join(thread3, NULL))
+    if (pthread_join(thread3, NULL))
     {
         fprintf(stderr, "Error while joining with child thread\n");
         exit(1);
@@ -152,7 +157,7 @@ int main(int argc, char *argv)
     {
         fprintf(stderr, "Error while joining with child thread\n");
         exit(1);
-    }*/
+    }
 }
 
 void clearBuffer(int *bufferPtr)
@@ -199,11 +204,16 @@ void *do_work(void *arg)
 
     //Loop here while shared num sequences is < 10
     //threadArgs->numCorrect < 10
-    while (*numCorrect < 10 || *finishedFlag)
+    while (*numCorrect < 10 || !(*finishedFlag))
     {
         fprintf(stderr, "\nThread %d entered do_work loop\n", tid);
         //Begin critical section
         pthread_mutex_lock(mutex);
+        if (*finishedFlag)
+        {
+            pthread_mutex_unlock(mutex);
+            break;
+        }
         indexPtr = threadArgs->bufferIndex;
         fprintf(stderr, "My id: %d\n", tid);
         //Set position in buffer1.
@@ -224,8 +234,7 @@ void *do_work(void *arg)
                 {
                     //Set flag to say race won.
                     *finishedFlag = true;
-                    fprintf(stderr, "Total sequences generated %d\n", *(threadArgs->totalCount));
-                    fprintf(stderr, "Number of correct sequences %d\n", *(threadArgs->numCorrect));
+                    fprintf(stderr, "Team 1 won!\n");
                 }
             }
             *indexPtr = 0;
@@ -236,10 +245,17 @@ void *do_work(void *arg)
             *indexPtr += 1;
         }
 
+        //Possible race condition
+        if (*finishedFlag)
+        {
+            fprintf(stderr, "Total sequences generated team1 %d\n", *(threadArgs->totalCount));
+            fprintf(stderr, "Number of correct sequences team1 %d\n", *(threadArgs->numCorrect));
+        }
+
         pthread_mutex_unlock(mutex);
         //fprintf(stderr, "Thread %d left crit section with index %d\n", tid, *indexPtr);
         //Sleep for now.
-        usleep(500000);
+        usleep(500);
     }
 
     return NULL;
@@ -260,7 +276,7 @@ void *do_work2(void *arg)
 
     //Loop here while shared num sequences is < 10
     //threadArgs->numCorrect < 10
-    while (*numCorrect < 10 || *finishedFlag)
+    while (*numCorrect < 10 || !(*finishedFlag))
     {
         fprintf(stderr, "\nThread %d entered do_work2 loop\n", tid);
         //Begin critical section
@@ -283,9 +299,8 @@ void *do_work2(void *arg)
                 //If we get here we are done, print the final result.
                 if (*numCorrect == 10)
                 {
+                    fprintf(stderr, "Team 2 won!");
                     *finishedFlag = true;
-                    fprintf(stderr, "Total sequences generated %d\n", *(threadArgs->totalCount));
-                    fprintf(stderr, "Number of correct sequences %d\n", *(threadArgs->numCorrect));
                 }
             }
             *indexPtr = 0;
@@ -295,29 +310,17 @@ void *do_work2(void *arg)
         {
             *indexPtr += 1;
         }
-
+        //Possible race condition
+        if (*finishedFlag)
+        {
+            fprintf(stderr, "Total sequences generated team2 %d\n", *(threadArgs->totalCount));
+            fprintf(stderr, "Number of correct sequences team2 %d\n", *(threadArgs->numCorrect));
+        }
         pthread_mutex_unlock(mutex);
         //fprintf(stderr, "Thread %d left crit section with index %d\n", tid, *indexPtr);
         //Sleep for now.
-        usleep(500000);
+        usleep(500);
     }
 
     return NULL;
 }
-/*
-//Critical section
-        pthread_mutex_lock(mutex);
-        (*numCorrect)++;
-        fprintf(stderr, "Thread %d entered critical section and made numCorrect equal %d\n", threadArgs->val, *numCorrect);
-
-        if ((*numCorrect) == 2)
-        {
-            fprintf(stderr, "Two achieved");
-        }
-
-        //Set our position
-        pthread_mutex_unlock(mutex);
-        fprintf(stderr, "Thread %d left critical section\n", threadArgs->val);
-        usleep(200000);
-
-        //Check the value of index, do we have a complete sequence?*/
