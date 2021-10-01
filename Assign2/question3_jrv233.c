@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 void clearBuffer(int *bufferPtr);
+int atomicUpdateFunction(pthread_mutex_t *mutexFn, int *totalCountPtr, int goal);
 void *do_work(void *arg);
 
 /*
@@ -75,13 +76,13 @@ int main(int argc, char *argv)
 }
 
 //Checks to see if we made it to the goal count yet. While loop condition
-int atomicUpdateFunction(pthread_mutex_t *mutexFn, int *countClientsPtr, int goal)
+int atomicUpdateFunction(pthread_mutex_t *mutexFn, int *totalCountPtr, int goal)
 {
     int retval = 0;
     pthread_mutex_lock(mutexFn);
-    if (*countClientsPtr < goal)
+    if (*totalCountPtr < goal)
     {
-        //printf("\n\ngoal: %d count: %d\n\n", goal, *countClientsPtr);
+        //printf("\n\ngoal: %d count: %d\n\n", goal, *totalCountPtr);
         retval = 1;
     }
     pthread_mutex_unlock(mutexFn);
