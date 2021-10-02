@@ -21,9 +21,11 @@ struct arguments
     int *bufferIndex;
     int *buffer;
     //Correct number, goal is 10
-    int *numCorrect;
+    int *numCorrect1;
+    int *numCorrect2;
     //All the sequences
-    int *totalCount;
+    int *totalCount1;
+    int *totalCount2;
     bool *finishedFlag;
 };
 
@@ -33,7 +35,8 @@ void printArg(void *arguments)
     printf("Val: %d\n", threadArg->val);
     printf("bufferIndex: %d\n", *(threadArg->bufferIndex));
     printf("bufferVal: %d\n", threadArg->buffer[1]);
-    printf("numCorrect: %d\n", *(threadArg->numCorrect));
+    printf("numCorrect1: %d\n", *(threadArg->numCorrect1));
+    printf("numCorrect2: %d\n", *(threadArg->numCorrect2));
 }
 int main(int argc, char *argv)
 {
@@ -70,19 +73,20 @@ int main(int argc, char *argv)
         //Don't use a ++ here! increments i
         threadArgs[i]->val = i + 1;
         threadArgs[i]->bufferIndex = &bufferIndex;
-        threadArgs[i]->numCorrect = &numCorrect1;
+        threadArgs[i]->numCorrect1 = &numCorrect1;
+        threadArgs[i]->numCorrect2 = &numCorrect2;
+        threadArgs[i]->totalCount1 = &totalCount1;
+        threadArgs[i]->totalCount2 = &totalCount2;
         threadArgs[i]->finishedFlag = &finishedFlag;
         if (i < 3)
         {
             threadArgs[i]->buffer = buffer1;
             threadArgs[i]->mutex = &buffer1Lock;
-            threadArgs[i]->totalCount = &totalCount1;
         }
         else
         {
             threadArgs[i]->buffer = buffer2;
             threadArgs[i]->mutex = &buffer2Lock;
-            threadArgs[i]->totalCount = &totalCount2;
         }
         printArg(threadArgs[i]);
     }
@@ -195,8 +199,11 @@ void *do_work(void *arg)
     int tid = threadArgs->val;
     pthread_mutex_t *mutex = threadArgs->mutex;
     //fprintf(stderr, "Thread with val: %d\n", threadArgs->val);
-    int *numCorrect = threadArgs->numCorrect;
-    int *totalCount = threadArgs->totalCount;
+    int *numCorrect1 = threadArgs->numCorrect1;
+    int *totalCount1 = threadArgs->totalCount1;
+    //Enemy teams scores
+    int *numCorrect2 = threadArgs->numCorrect2;
+    int *totalCount2 = threadArgs->totalCount2;
     bool *finishedFlag = threadArgs->finishedFlag;
     int *indexPtr = NULL;
     bool createdSequence = false;
@@ -204,7 +211,7 @@ void *do_work(void *arg)
 
     //Loop here while shared num sequences is < 10
     //threadArgs->numCorrect < 10
-    while (*numCorrect < 10 || !(*finishedFlag))
+    while (*numCorrect1 < 10 || !(*finishedFlag))
     {
         fprintf(stderr, "\nThread %d entered do_work loop\n", tid);
         //Begin critical section
@@ -221,16 +228,16 @@ void *do_work(void *arg)
         if (*indexPtr == 2)
         {
             //Log this attempt
-            *totalCount += 1;
+            *totalCount1 += 1;
             printBuffer(threadArgs->buffer);
             createdSequence = createdSequence1(threadArgs->buffer);
             if (createdSequence)
             {
                 fprintf(stderr, "123\n");
-                *numCorrect += 1;
+                *numCorrect1 += 1;
                 //fprintf(stderr, "Count: %d\n", *numCorrect);
                 //If we get here we are done, print the final result.
-                if (*numCorrect == 10)
+                if (*numCorrect1 == 10)
                 {
                     //Set flag to say race won.
                     *finishedFlag = true;
@@ -248,14 +255,16 @@ void *do_work(void *arg)
         //Possible race condition
         if (*finishedFlag)
         {
-            fprintf(stderr, "Total sequences generated team1 %d\n", *(threadArgs->totalCount));
-            fprintf(stderr, "Number of correct sequences team1 %d\n", *(threadArgs->numCorrect));
+            fprintf(stderr, "Total sequences generated team1 %d\n", *(threadArgs->totalCount1));
+            fprintf(stderr, "Number of correct sequences team1 %d\n", *(threadArgs->numCorrect1));
+            fprintf(stderr, "Total sequences generated team2 %d\n", *(threadArgs->totalCount2));
+            fprintf(stderr, "Number of correct sequences team2 %d\n", *(threadArgs->numCorrect2));
         }
 
         pthread_mutex_unlock(mutex);
         //fprintf(stderr, "Thread %d left crit section with index %d\n", tid, *indexPtr);
         //Sleep for now.
-        usleep(500);
+        usleep(500000);
     }
 
     return NULL;
@@ -264,21 +273,22 @@ void *do_work(void *arg)
 void *do_work2(void *arg)
 {
     struct arguments *threadArgs = (struct arguments *)arg;
-    int *numCorrect = threadArgs->numCorrect;
+    int *numCorrect2 = threadArgs->numCorrect2;
     pthread_mutex_t *mutex = threadArgs->mutex;
     int tid = threadArgs->val;
     //fprintf(stderr, "Thread with val: %d\n", threadArgs->val);
-    int *totalCount = threadArgs->totalCount;
+    int *totalCount2 = threadArgs->totalCount2;
     bool *finishedFlag = threadArgs->finishedFlag;
     int *indexPtr = NULL;
     bool createdSequence = false;
-    fprintf(stderr, "\nThread %d entered do_work2\n", tid);
+    //fprintf(stderr, "\nThread %d entered do_work2\n", tid);
 
     //Loop here while shared num sequences is < 10
     //threadArgs->numCorrect < 10
-    while (*numCorrect < 10 || !(*finishedFlag))
+    //TODO: I forgor lock finishFlag between both threads.
+    while (*numCorrect2 < 10 || !(*finishedFlag))
     {
-        fprintf(stderr, "\nThread %d entered do_work2 loop\n", tid);
+        //fprintf(stderr, "\nThread %d entered do_work2 loop\n", tid);
         //Begin critical section
         pthread_mutex_lock(mutex);
         indexPtr = threadArgs->bufferIndex;
@@ -288,16 +298,16 @@ void *do_work2(void *arg)
         if (*indexPtr == 2)
         {
             //Log this attempt
-            *totalCount += 1;
+            *totalCount2 += 1;
             printBuffer(threadArgs->buffer);
             createdSequence = createdSequence2(threadArgs->buffer);
             if (createdSequence)
             {
                 fprintf(stderr, "456\n");
-                *numCorrect += 1;
+                *numCorrect2 += 1;
                 //fprintf(stderr, "Count: %d\n", *numCorrect);
                 //If we get here we are done, print the final result.
-                if (*numCorrect == 10)
+                if (*numCorrect2 == 10)
                 {
                     fprintf(stderr, "Team 2 won!");
                     *finishedFlag = true;
@@ -313,13 +323,15 @@ void *do_work2(void *arg)
         //Possible race condition
         if (*finishedFlag)
         {
-            fprintf(stderr, "Total sequences generated team2 %d\n", *(threadArgs->totalCount));
-            fprintf(stderr, "Number of correct sequences team2 %d\n", *(threadArgs->numCorrect));
+            fprintf(stderr, "Total sequences generated team2 %d\n", *(threadArgs->totalCount2));
+            fprintf(stderr, "Number of correct sequences team2 %d\n", *(threadArgs->numCorrect2));
+            fprintf(stderr, "Total sequences generated team1 %d\n", *(threadArgs->totalCount1));
+            fprintf(stderr, "Number of correct sequences team1 %d\n", *(threadArgs->numCorrect1));
         }
         pthread_mutex_unlock(mutex);
         //fprintf(stderr, "Thread %d left crit section with index %d\n", tid, *indexPtr);
         //Sleep for now.
-        usleep(500);
+        usleep(500000);
     }
 
     return NULL;
