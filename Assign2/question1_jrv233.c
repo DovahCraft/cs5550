@@ -60,7 +60,7 @@ int main(int argc, char *argv)
         threadArgs[i]->sequenceMade = &sequenceMade;
         threadArgs[i]->count = &count;
         threadArgs[i]->totalCount = &totalCount;
-        printArg(threadArgs[i]);
+        //printArg(threadArgs[i]);
     }
 
     //Now that we have three sets of arguments, pass them to start the threads.
