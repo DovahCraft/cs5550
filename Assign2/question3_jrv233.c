@@ -25,7 +25,7 @@ struct arguments
 void printArg(void *arguments)
 {
     struct arguments *threadArg = (struct arguments *)arguments;
-    // printf("Val: %d\n", *(threadArg->currTid));
+    // fprintf(stderr,"Val: %d\n", *(threadArg->currTid));
 }
 int main(int argc, char *argv)
 {
@@ -60,7 +60,7 @@ int main(int argc, char *argv)
         if (pthread_create(&(threads[i]), NULL,
                            do_work, (void *)threadArgs[i]))
         {
-            printf( "Error while joining with child thread #%d\n", i);
+            fprintf(stderr, "Error while joining with child thread #%d\n", i);
             exit(1);
         }
     }
@@ -69,25 +69,10 @@ int main(int argc, char *argv)
     {
         if (pthread_join(threads[i], NULL))
         {
-            printf( "Error while joining with child thread #%d\n", i);
+            fprintf(stderr, "Error while joining with child thread #%d\n", i);
             exit(1);
         }
     }
-}
-
-//Checks to see if we made it to the goal count yet. While loop condition
-int atomicUpdateFunction(pthread_mutex_t *mutexFn, int *totalCountPtr, int goal)
-{
-    int retval = 0;
-    pthread_mutex_lock(mutexFn);
-    if (*totalCountPtr < goal)
-    {
-        //printf("\n\ngoal: %d count: %d\n\n", goal, *totalCountPtr);
-        retval = 1;
-    }
-    pthread_mutex_unlock(mutexFn);
-
-    return retval;
 }
 
 void *do_work(void *arg)
@@ -99,17 +84,13 @@ void *do_work(void *arg)
     pthread_cond_t *findingThread = threadArgs->findingThread;
     int goal = 990;
     int *currCount = threadArgs->count;
-    printf( "Starting thread #%d\n", tid);
-    //printf( "Thread with val: %d\n", threadArgs->val);
-    while (atomicUpdateFunction(mutex, currCount, goal))
+    fprintf(stderr, "Starting thread #%d\n", tid);
+    //fprintf(stderr, "Thread with val: %d\n", threadArgs->val);
+    while (true)
     {
         pthread_mutex_lock(mutex);
-        //Refresh the tid that is next up.
-        *nextTid = *(threadArgs->currTid);
-        //printf( "Thread #%d acquired lock, next tid is %d\n", tid, *nextTid);
         while (*nextTid != tid)
         {
-            //  printf( "Thread #%d in while loop.\n", tid);
             pthread_cond_wait(findingThread, mutex);
         }
 
@@ -117,7 +98,7 @@ void *do_work(void *arg)
         //Don't run if we are ready to quit.
         if (*currCount == goal)
         {
-            //   printf( "Thread #%d entered finishGoal.\n", tid);
+            //printf( "Thread #%d entered finishGoal.\n", tid);
             *nextTid += 1;
             pthread_mutex_unlock(mutex);
             pthread_cond_broadcast(findingThread);
@@ -125,7 +106,7 @@ void *do_work(void *arg)
         }
         //Add to our count and signal the next thread.
         *(threadArgs->count) += tid;
-        printf( "my num: %d, total: %d\n", tid, *currCount);
+        fprintf(stderr, "my num: %d, total: %d\n", tid, *currCount);
         if (tid == 9)
         {
             *nextTid = 0;
@@ -135,13 +116,11 @@ void *do_work(void *arg)
             *nextTid += 1;
         }
         if(*currCount == goal){
-            printf("Total: %d\n", goal);
+            fprintf(stderr,"Total: %d\n", goal);
         }
 
-        // printf( "Thread #%d incremented tid to %d.\n", tid, *nextTid);
         pthread_mutex_unlock(mutex);
         pthread_cond_broadcast(findingThread);
     }
-    //Shouldn't be reachable tbh
     return NULL;
 }

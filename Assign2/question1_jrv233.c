@@ -154,7 +154,7 @@ void *do_work(void *arg)
         {
             //Log this attempt
             *totalCount += 1;
-            printBuffer(threadArgs->buffer);
+            //printBuffer(threadArgs->buffer);
             madeCorrectSeq = createdSequence1(threadArgs->buffer);
             if (madeCorrectSeq)
             {
@@ -165,8 +165,8 @@ void *do_work(void *arg)
                 //If we get here we are done, print the final result.
                 if (*count == 10)
                 {
-                    printf( "Total sequences generated %d\n", *(threadArgs->totalCount));
-                    printf( "Number of correct sequences %d\n", *(threadArgs->count));
+                    printf( "Total sequences generated: %d\n", *(threadArgs->totalCount));
+                    printf( "Number of correct sequences: %d\n", *(threadArgs->count));
                 }
             }
             *indexPtr = 0;
