@@ -124,7 +124,7 @@ void *decrement_work(void *arg)
         //printf( "Curr count in decrement: %d", *currCount);
         while (*currCount != 10)
         {
-            printf( "Thread #%d waiting to decrement\n", tid);
+            //printf( "Thread #%d waiting to decrement\n", tid);
             pthread_cond_wait(switchingDirection, mutex);
         }
         while (*currCount > 0)
@@ -162,7 +162,7 @@ void *increment_work(void *arg)
         //printf( "Curr count in increment: %d", *currCount);
         while (*currCount != 0)
         {
-            printf( "Thread #%d waiting to increment\n", tid);
+            //printf( "Thread #%d waiting to increment\n", tid);
             pthread_cond_wait(switchingDirection, mutex);
         }
         while (*currCount < 10)
