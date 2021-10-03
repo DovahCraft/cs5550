@@ -9,6 +9,7 @@ bool createdSequence1(int buffer1[]);
 bool createdSequence2(int buffer2[]);
 void *do_work(void *arg);
 void *do_work2(void *arg);
+
 /*
  Problem 2: Threads racing problem
 */
@@ -17,6 +18,7 @@ void *do_work2(void *arg);
 struct arguments
 {
     pthread_mutex_t *mutex;
+    pthread_mutex_t *finishedLock;
     int val;
     int *bufferIndex;
     int *buffer;
@@ -33,7 +35,7 @@ void printArg(void *arguments)
 {
     struct arguments *threadArg = (struct arguments *)arguments;
     printf("Val: %d\n", threadArg->val);
-    printf("bufferIndex: %d\n", *(threadArg->bufferIndex));
+    //printf("bufferIndex: %d\n", *(threadArg->bufferIndex));
     printf("bufferVal: %d\n", threadArg->buffer[1]);
     printf("numCorrect1: %d\n", *(threadArg->numCorrect1));
     printf("numCorrect2: %d\n", *(threadArg->numCorrect2));
@@ -48,7 +50,8 @@ int main(int argc, char *argv)
     pthread_t thread5;
     int buffer1[3] = {0, 0, 0};
     int buffer2[3] = {0, 0, 0};
-    int bufferIndex = 0;
+    int bufferIndex1 = 0;
+    int bufferIndex2 = 0;
     //Num correct by each team
     int numCorrect1 = 0;
     int numCorrect2 = 0;
@@ -61,31 +64,32 @@ int main(int argc, char *argv)
     int i;
     pthread_mutex_t buffer1Lock;
     pthread_mutex_t buffer2Lock;
-    pthread_mutex_t buffer3Lock;
+    pthread_mutex_t finishedLock;
     pthread_mutex_init(&buffer1Lock, NULL);
     pthread_mutex_init(&buffer2Lock, NULL);
-
+    pthread_mutex_init(&finishedLock, NULL);
     //Initialize arguments struct
     for (i = 0; i < size; i++)
     {
         threadArgs[i] = (struct arguments *)calloc(1, sizeof(struct arguments));
-
         //Don't use a ++ here! increments i
-        threadArgs[i]->val = i + 1;
-        threadArgs[i]->bufferIndex = &bufferIndex;
+        threadArgs[i]->val = i + 1;      
         threadArgs[i]->numCorrect1 = &numCorrect1;
         threadArgs[i]->numCorrect2 = &numCorrect2;
         threadArgs[i]->totalCount1 = &totalCount1;
         threadArgs[i]->totalCount2 = &totalCount2;
         threadArgs[i]->finishedFlag = &finishedFlag;
+        threadArgs[i]->finishedLock = &finishedLock;
         if (i < 3)
         {
             threadArgs[i]->buffer = buffer1;
+            threadArgs[i]->bufferIndex = &bufferIndex1;
             threadArgs[i]->mutex = &buffer1Lock;
         }
         else
         {
             threadArgs[i]->buffer = buffer2;
+            threadArgs[i]->bufferIndex = &bufferIndex2;
             threadArgs[i]->mutex = &buffer2Lock;
         }
         printArg(threadArgs[i]);
@@ -164,6 +168,7 @@ int main(int argc, char *argv)
     }
 }
 
+
 void clearBuffer(int *bufferPtr)
 {
     int size = 3;
@@ -193,6 +198,22 @@ bool printBuffer(int buffer1[])
 
 //}
 
+//Checks to see if we made it to the goal count yet. While loop condition
+int atomicUpdateFunction(pthread_mutex_t *mutexFn, int *finishedFlagPtr, int count)
+{
+    int retval = 0;
+    pthread_mutex_lock(mutexFn);
+    if (*finishedFlagPtr || count < 10)
+    {
+        //printf("\n\ngoal: %d count: %d\n\n", goal, *totalCountPtr);
+        retval = 1;
+    }
+    pthread_mutex_unlock(mutexFn);
+
+    return retval;
+}
+
+
 void *do_work(void *arg)
 {
     struct arguments *threadArgs = (struct arguments *)arg;
@@ -211,7 +232,7 @@ void *do_work(void *arg)
 
     //Loop here while shared num sequences is < 10
     //threadArgs->numCorrect < 10
-    while (*numCorrect1 < 10 || !(*finishedFlag))
+    while (*numCorrect1 < 10 && !(*finishedFlag))
     {
         fprintf(stderr, "\nThread %d entered do_work loop\n", tid);
         //Begin critical section
@@ -286,7 +307,7 @@ void *do_work2(void *arg)
     //Loop here while shared num sequences is < 10
     //threadArgs->numCorrect < 10
     //TODO: I forgor lock finishFlag between both threads.
-    while (*numCorrect2 < 10 || !(*finishedFlag))
+    while (*numCorrect2 < 10 && !(*finishedFlag))
     {
         //fprintf(stderr, "\nThread %d entered do_work2 loop\n", tid);
         //Begin critical section
