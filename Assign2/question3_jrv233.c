@@ -25,7 +25,7 @@ struct arguments
 void printArg(void *arguments)
 {
     struct arguments *threadArg = (struct arguments *)arguments;
-    // fprintf(stderr,"Val: %d\n", *(threadArg->currTid));
+    // printf("Val: %d\n", *(threadArg->currTid));
 }
 int main(int argc, char *argv)
 {
@@ -60,7 +60,7 @@ int main(int argc, char *argv)
         if (pthread_create(&(threads[i]), NULL,
                            do_work, (void *)threadArgs[i]))
         {
-            fprintf(stderr, "Error while joining with child thread #%d\n", i);
+            printf( "Error while joining with child thread #%d\n", i);
             exit(1);
         }
     }
@@ -69,7 +69,7 @@ int main(int argc, char *argv)
     {
         if (pthread_join(threads[i], NULL))
         {
-            fprintf(stderr, "Error while joining with child thread #%d\n", i);
+            printf( "Error while joining with child thread #%d\n", i);
             exit(1);
         }
     }
@@ -84,8 +84,8 @@ void *do_work(void *arg)
     pthread_cond_t *findingThread = threadArgs->findingThread;
     int goal = 990;
     int *currCount = threadArgs->count;
-    fprintf(stderr, "Starting thread #%d\n", tid);
-    //fprintf(stderr, "Thread with val: %d\n", threadArgs->val);
+    printf( "Starting thread #%d\n", tid);
+    //printf( "Thread with val: %d\n", threadArgs->val);
     while (true)
     {
         pthread_mutex_lock(mutex);
@@ -106,7 +106,7 @@ void *do_work(void *arg)
         }
         //Add to our count and signal the next thread.
         *(threadArgs->count) += tid;
-        fprintf(stderr, "my num: %d, total: %d\n", tid, *currCount);
+        printf( "my num: %d, total: %d\n", tid, *currCount);
         if (tid == 9)
         {
             *nextTid = 0;
@@ -116,7 +116,7 @@ void *do_work(void *arg)
             *nextTid += 1;
         }
         if(*currCount == goal){
-            fprintf(stderr,"Total: %d\n", goal);
+            printf("Total: %d\n", goal);
         }
 
         pthread_mutex_unlock(mutex);
