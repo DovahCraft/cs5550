@@ -79,7 +79,7 @@ int main(int argc, char *argv)
             threadArgs[i]->bufferIndex = &bufferIndex2;
             threadArgs[i]->mutex = &buffer2Lock;
         }
-        printArg(threadArgs[i]);
+       // printArg(threadArgs[i]);
     }
 
         for (i = 0; i < size/2; i++)
@@ -147,26 +147,6 @@ bool printBuffer(int buffer1[])
     printf( "\nBuffer: [%d,%d,%d]\n", buffer1[0], buffer1[1], buffer1[2]);
 }
 
-//bool finishedSequences(void *lock, void* numCorrect){
-
-//}
-
-//Checks to see if we made it to the goal count yet. While loop condition
-int atomicUpdateFunction(pthread_mutex_t *mutexFn, int *finishedFlagPtr, int count)
-{
-    int retval = 0;
-    pthread_mutex_lock(mutexFn);
-    if (*finishedFlagPtr || count < 10)
-    {
-        //printf("\n\ngoal: %d count: %d\n\n", goal, *totalCountPtr);
-        retval = 1;
-    }
-    pthread_mutex_unlock(mutexFn);
-
-    return retval;
-}
-
-
 void *do_work(void *arg)
 {
     struct arguments *threadArgs = (struct arguments *)arg;
@@ -212,7 +192,7 @@ void *do_work(void *arg)
                 {
                     //Set flag to say race won.
                     *finishedFlag = true;
-                    printf( "Team 1 won!\n");
+                    printf( "Team 1 won!");
                 }
             }
             *indexPtr = 0;
@@ -222,14 +202,13 @@ void *do_work(void *arg)
         {
             *indexPtr += 1;
         }
-
-        //Possible race condition
-        if (*finishedFlag)
+        //Only print this if you are the winner and the game is over.
+        if (*finishedFlag && *numCorrect1 == 10)
         {
-            printf( "Total sequences generated team1 %d\n", *(threadArgs->totalCount1));
-            printf( "Number of correct sequences team1 %d\n", *(threadArgs->numCorrect1));
-            printf( "Total sequences generated team2 %d\n", *(threadArgs->totalCount2));
-            printf( "Number of correct sequences team2 %d\n", *(threadArgs->numCorrect2));
+            printf( "Total sequences generated team1: %d\n", *(threadArgs->totalCount1));
+            printf( "Number of correct sequences team1: %d\n", *(threadArgs->numCorrect1));
+            printf( "Total sequences generated team2: %d\n", *(threadArgs->totalCount2));
+            printf( "Number of correct sequences team2: %d\n", *(threadArgs->numCorrect2));
         }
 
         pthread_mutex_unlock(mutex);
@@ -259,6 +238,11 @@ void *do_work2(void *arg)
         //printf( "\nThread %d entered do_work2 loop\n", tid);
         //Begin critical section
         pthread_mutex_lock(mutex);
+        if (*finishedFlag)
+        {
+            pthread_mutex_unlock(mutex);
+            break;
+        }
         indexPtr = threadArgs->bufferIndex;
         printf( "My id: %d\n", tid);
         //Set position in buffer1.
@@ -288,8 +272,8 @@ void *do_work2(void *arg)
         {
             *indexPtr += 1;
         }
-        //Possible race condition
-        if (*finishedFlag)
+        //Only print this if you are the winner and the game is over.
+        if (*finishedFlag && *numCorrect2 == 10)
         {
             printf( "Total sequences generated team1: %d\n", *(threadArgs->totalCount1));
             printf( "Number of correct sequences team1: %d\n", *(threadArgs->numCorrect1));
