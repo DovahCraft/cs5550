@@ -20,6 +20,7 @@ struct arguments
     pthread_cond_t *switchingDirection;
     int *count;
     int *pingIterations;
+    int goalIterations;
 };
 
 void printArg(void *arguments)
@@ -36,6 +37,7 @@ int main(int argc, char *argv)
     //Set count to 0 to start with.
     int count = 0;
     int pingIterations = 0;
+    int goalIterations = 4;
     struct arguments *threadArgs[size];
     pthread_t threads[size];
     pthread_mutex_t mutex;
@@ -54,42 +56,43 @@ int main(int argc, char *argv)
         threadArgs[i]->mutex = &mutex;
         threadArgs[i]->switchingDirection = &switchingDirection;
         threadArgs[i]->pingIterations = &pingIterations;
+        threadArgs[i]->goalIterations = goalIterations;
         //printArg(threadArgs[i]);
     }
 
     if (pthread_create(&(threads[0]), NULL,
                        increment_work, (void *)threadArgs[0]))
     {
-        fprintf(stderr, "Error while joining with child thread #%d\n", i);
+        printf( "Error while joining with child thread #%d\n", i);
         exit(1);
     }
 
     if (pthread_create(&(threads[1]), NULL,
                        decrement_work, (void *)threadArgs[1]))
     {
-        fprintf(stderr, "Error while joining with child thread #%d\n", i);
+        printf( "Error while joining with child thread #%d\n", i);
         exit(1);
     }
 
     if (pthread_join(threads[0], NULL))
     {
-        fprintf(stderr, "Error while joining with child thread #%d\n", i);
+        printf( "Error while joining with child thread #%d\n", i);
         exit(1);
     }
 
     if (pthread_join(threads[1], NULL))
     {
-        fprintf(stderr, "Error while joining with child thread #%d\n", i);
+        printf( "Error while joining with child thread #%d\n", i);
         exit(1);
     }
 }
 
 //Checks to see if we made it to the goal count yet. While loop condition
-int atomicUpdateFunction(pthread_mutex_t *mutexFn, int *pingIterationsPtr, int goal)
+int atomicUpdateFunction(pthread_mutex_t *mutexFn, int *pingIterationsPtr, int goalIterations)
 {
     int retval = 0;
     pthread_mutex_lock(mutexFn);
-    if (*pingIterationsPtr < goal)
+    if (*pingIterationsPtr <= goalIterations)
     {
         //printf("\n\ngoal: %d count: %d\n\n", goal, *countClientsPtr);
         retval = 1;
@@ -108,24 +111,32 @@ void *decrement_work(void *arg)
 
     int *currCount = threadArgs->count;
     int *pingIterations = threadArgs->pingIterations;
-    while (atomicUpdateFunction(mutex, pingIterations, 5))
+    int goalIterations = threadArgs->goalIterations;
+    while (atomicUpdateFunction(mutex, pingIterations, goalIterations))
     {
         pthread_mutex_lock(mutex);
-        //fprintf(stderr, "Curr count in decrement: %d", *currCount);
+        //We finished.
+        if(*pingIterations == goalIterations){
+            pthread_cond_signal(switchingDirection);
+            pthread_mutex_unlock(mutex);
+            return NULL;
+        }
+        //printf( "Curr count in decrement: %d", *currCount);
         while (*currCount != 10)
         {
-            //fprintf(stderr, "Thread #%d waiting to decrement", tid);
+            //printf( "Thread #%d waiting to decrement\n", tid);
             pthread_cond_wait(switchingDirection, mutex);
         }
         while (*currCount > 0)
         {
             (*currCount)--;
-            fprintf(stderr, "Count is now (dec fn): %d\n", *currCount);
+            printf( "Count is now (dec fn): %d\n", *currCount);
         }
         //Mark this ping it
         (*pingIterations)++;
-        pthread_mutex_unlock(mutex);
         pthread_cond_signal(switchingDirection);
+        pthread_mutex_unlock(mutex);
+
     }
     return NULL;
 }
@@ -136,27 +147,34 @@ void *increment_work(void *arg)
     int tid = threadArgs->tid;
     pthread_mutex_t *mutex = threadArgs->mutex;
     pthread_cond_t *switchingDirection = threadArgs->switchingDirection;
-
     int *currCount = threadArgs->count;
     int *pingIterations = threadArgs->pingIterations;
-    while (atomicUpdateFunction(mutex, pingIterations, 5))
+    int goalIterations = threadArgs->goalIterations;
+    while (atomicUpdateFunction(mutex, pingIterations, goalIterations))
     {
         pthread_mutex_lock(mutex);
-        //fprintf(stderr, "Curr count in increment: %d", *currCount);
+        //We finished.
+        if(*pingIterations == goalIterations){
+            pthread_cond_signal(switchingDirection);
+            pthread_mutex_unlock(mutex);
+            return NULL;
+        }
+        //printf( "Curr count in increment: %d", *currCount);
         while (*currCount != 0)
         {
-            //fprintf(stderr, "Thread #%d waiting to increment", tid);
+            //printf( "Thread #%d waiting to increment\n", tid);
             pthread_cond_wait(switchingDirection, mutex);
         }
         while (*currCount < 10)
         {
             (*currCount)++;
-            fprintf(stderr, "Count is now (inc fn): %d\n", *currCount);
+            printf( "Count is now (inc fn): %d\n", *currCount);
         }
         //Mark this ping it
         (*pingIterations)++;
-        pthread_mutex_unlock(mutex);
         pthread_cond_signal(switchingDirection);
+        pthread_mutex_unlock(mutex);
+
     }
     return NULL;
 }
