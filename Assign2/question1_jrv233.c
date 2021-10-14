@@ -98,7 +98,6 @@ int main(int argc, char *argv)
 
 void clearBuffer(int *bufferPtr)
 {
-    // printf("Val from clear_buffer: %d", bufferPtr[1]);
     int size = 3;
     for (int i = 0; i < size; i++)
     {
