@@ -24,10 +24,12 @@ struct arguments
 };
 
 void random_sleep(double a, double b);
+void *startBaking(void *args);
 void prepareCookies(char *bakerStr, int bakerId);
 void waitForCookies(char *bakerStr, int bakerId);
 void printArg(struct arguments args);
 void grabMitts(void *args);
+void putDownMitts(void *args);
 
 #define NUM_ITERATIONS 10
 #define NUM_LEFT_OVEN_MITTS 3
@@ -81,9 +83,7 @@ int main(int argc, char **argv)
   // IMPLEMENT CODE HERE
   // Create batches of workers
   int totalBakers = num_left_handed_bakers + num_right_handed_bakers + num_cautious_bakers;
-  pthread_t left_handed_bakers[num_left_handed_bakers];
-  pthread_t right_handed_bakers[num_right_handed_bakers];
-  pthread_t cautious_bakers[num_cautious_bakers];
+  pthread_t baker_threads[totalBakers];
   struct arguments threadArgs[totalBakers];
   // Signals to check for mitts again instead of busy waiting.
   pthread_cond_t putDownMitts;
@@ -91,6 +91,9 @@ int main(int argc, char **argv)
   pthread_cond_t grabbedMitts;
   pthread_mutex_t leftLock;
   pthread_mutex_t rightLock;
+  pthread_cond_init(&putDownMitts, NULL);
+  pthread_mutex_init(&leftLock, NULL);
+  pthread_mutex_init(&rightLock, NULL);
   int numLeftMitts = 3;
   int numRightMitts = 3;
   int currLeftId = 0;
@@ -128,8 +131,29 @@ int main(int argc, char **argv)
     // Shared args
     threadArgs[i].numLeftMitts = &numLeftMitts;
     threadArgs[i].numRightMitts = &numRightMitts;
+    threadArgs[i].putDownMitts = &putDownMitts;
     // threadArgs[i]->bufferIndex = 0;
     printArg(threadArgs[i]);
+  }
+
+  // Create baker threads
+  for (int i = 0; i < totalBakers; i++)
+  {
+    if (pthread_create(&(baker_threads[i]), NULL,
+                       startBaking, (void *)&threadArgs[i]))
+    {
+      printf("Error while joining with child thread #%d\n", i);
+      exit(1);
+    }
+  }
+  // Join waiting for them to finish baking.
+  for (int i = 0; i < totalBakers; i++)
+  {
+    if (pthread_join(baker_threads[i], NULL))
+    {
+      printf("Error while joining with child thread #%d\n", i);
+      exit(1);
+    }
   }
 }
 
@@ -141,7 +165,7 @@ void printArg(struct arguments args)
 }
 
 // Driver function for each thread to run
-void startBaking(void *args)
+void *startBaking(void *args)
 {
   struct arguments *threadArgs = (struct arguments *)args;
   int bakingIterations = NUM_ITERATIONS;
@@ -153,8 +177,8 @@ void startBaking(void *args)
   {
     prepareCookies(bakerStr, bakerId);
     grabMitts(threadArgs);
-
     waitForCookies(bakerStr, bakerId);
+    putDownMitts(threadArgs);
   }
 }
 
@@ -165,26 +189,35 @@ void grabMitts(void *args)
   pthread_mutex_t *leftLock = threadArgs->leftMutex;
   pthread_mutex_t *rightLock = threadArgs->rightMutex;
   pthread_cond_t *putDownMitts = threadArgs->putDownMitts;
+  char *bakerStr = threadArgs->bakerStr;
+  int bakerId = threadArgs->bakerId;
   // While loop with cond_wait for mitts.
   // If left baker || cautious baker
   if (threadArgs->bakerType == LEFT_HANDED || threadArgs->bakerType == CAUTIOUS)
   {
+    fprintf(stderr, "[%s %d] wants a left-handed mitt...\n", bakerStr, bakerId);
     pthread_mutex_lock(leftLock);
-    while (threadArgs->numLeftMitts == 0)
+    while (*(threadArgs->numLeftMitts) == 0)
     {
       pthread_cond_wait(putDownMitts, leftLock);
     }
+    // Grab the mitt
+    *(threadArgs->numLeftMitts) -= 1;
+    fprintf(stderr, "[%s %d] has got a left-handed mitt...\n", bakerStr, bakerId);
     pthread_mutex_unlock(leftLock);
   }
 
   // If right baker || cautious baker
   if (threadArgs->bakerType == RIGHT_HANDED || threadArgs->bakerType == CAUTIOUS)
   {
+    fprintf(stderr, "[%s %d] wants a right-handed mitt...\n", bakerStr, bakerId);
     pthread_mutex_lock(rightLock);
-    while (threadArgs->numRightMitts == 0)
+    while (*(threadArgs->numRightMitts) == 0)
     {
       pthread_cond_wait(putDownMitts, rightLock);
     }
+    *(threadArgs->numRightMitts) -= 1;
+    fprintf(stderr, "[%s %d] has got a right-handed mitt...\n", bakerStr, bakerId);
     pthread_mutex_unlock(rightLock);
   }
 }
@@ -196,16 +229,15 @@ void putDownMitts(void *args)
 
 void prepareCookies(char *bakerStr, int bakerId)
 {
-  fprintf(stderr, "Baker %d preparing the cookies for the oven.", bakerId);
+  fprintf(stderr, "[%s %d] is working...\n", bakerStr, bakerId);
   // Sleep (work) for .2 to .5 seconds
   random_sleep(.2, .5);
-  fprintf(stderr, "Baker %d finished preparing the cookies for the oven.", bakerId);
 }
 
 void waitForCookies(char *bakerStr, int bakerId)
 {
-  fprintf(stderr, "[%s %d] has put cookies in the oven and is waiting...", bakerStr, bakerId);
+  fprintf(stderr, "[%s %d] has put cookies in the oven and is waiting...\n", bakerStr, bakerId);
   // Sleep (work) for .2 to .5 seconds
   random_sleep(.2, .5);
-  fprintf(stderr, "[%s %d] has taken cookies out of the oven...", bakerStr, bakerId);
+  fprintf(stderr, "[%s %d] has taken cookies out of the oven...\n", bakerStr, bakerId);
 }
