@@ -2,6 +2,8 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <time.h>
+#include <sys/time.h>
 
 typedef enum
 {
@@ -22,6 +24,13 @@ struct arguments
   baker_type bakerType;
   int bakerId;
   char *bakerStr;
+  double waitTime;
+  // Shared values for waitTime.
+  double *leftTotalWait;
+  double *rightTotalWait;
+  double *cautiousTotalWait;
+  // Lock for adding to the totals.
+  pthread_mutex_t *sumMutex;
 };
 
 void random_sleep(double a, double b);
@@ -48,6 +57,10 @@ void random_sleep(double lbound_sec, double ubound_sec)
   return;
 }
 
+double getDuration(struct timeval start, struct timeval stop)
+{
+  return (double)(stop.tv_usec - start.tv_usec) / 1000000 + (double)(stop.tv_sec - start.tv_sec);
+}
 /*
  * Main function
  */
@@ -86,22 +99,30 @@ int main(int argc, char **argv)
   int totalBakers = num_left_handed_bakers + num_right_handed_bakers + num_cautious_bakers;
   pthread_t baker_threads[totalBakers];
   struct arguments threadArgs[totalBakers];
+
   // Signals to check for mitts again instead of busy waiting.
   pthread_cond_t putDownLeftMitt;
   pthread_cond_t putDownRightMitt;
-  // Not sure if this is needed.
-  pthread_cond_t grabbedMitts;
+
+  // Lock both types of mitts
   pthread_mutex_t leftLock;
   pthread_mutex_t rightLock;
   pthread_cond_init(&putDownLeftMitt, NULL);
   pthread_cond_init(&putDownRightMitt, NULL);
   pthread_mutex_init(&leftLock, NULL);
   pthread_mutex_init(&rightLock, NULL);
+
+  // Init arguments
   int numLeftMitts = 3;
   int numRightMitts = 3;
   int currLeftId = 0;
   int currRightId = 0;
   int currCautiousId = 0;
+
+  // Total sums of baker wait times for average.
+  double leftTotalWait = 0;
+  double rightTotalWait = 0;
+  double cautiousTotalWait = 0;
 
   for (int i = 0; i < totalBakers; i++)
   {
@@ -136,8 +157,10 @@ int main(int argc, char **argv)
     threadArgs[i].numRightMitts = &numRightMitts;
     threadArgs[i].putDownLeftMitt = &putDownLeftMitt;
     threadArgs[i].putDownRightMitt = &putDownRightMitt;
-    // threadArgs[i]->bufferIndex = 0;
-    // printArg(threadArgs[i]);
+    threadArgs[i].leftTotalWait = &leftTotalWait;
+    threadArgs[i].rightTotalWait = &rightTotalWait;
+    threadArgs[i].cautiousTotalWait = &cautiousTotalWait;
+    threadArgs[i].waitTime = 0;
   }
 
   // Create baker threads
@@ -159,6 +182,12 @@ int main(int argc, char **argv)
       exit(1);
     }
   }
+
+  // Print averages
+  printf("\n\n==================================\nAVERAGE WAIT TIMES\n=========================================\n\n");
+  printf("Left average wait (%f/%d): %f\n", leftTotalWait, num_left_handed_bakers, leftTotalWait / (double)num_left_handed_bakers);
+  printf("Right average wait (%f/%d): %f\n", rightTotalWait, num_right_handed_bakers, rightTotalWait / (double)num_right_handed_bakers);
+  printf("Cautious average wait (%f/%d): %f\n", cautiousTotalWait, num_cautious_bakers, cautiousTotalWait / (double)num_cautious_bakers);
 }
 
 void printArg(struct arguments args)
@@ -184,6 +213,8 @@ void *startBaking(void *args)
     waitForCookies(bakerStr, bakerId);
     putDownMitts(threadArgs);
   }
+  // Print out our wait time
+  printf("[%s %d] WAIT-TIME = %f....\n", bakerStr, bakerId, threadArgs->waitTime);
 }
 
 void grabMitts(void *args)
@@ -195,15 +226,37 @@ void grabMitts(void *args)
   pthread_cond_t *putDownRightMitt = threadArgs->putDownRightMitt;
   char *bakerStr = threadArgs->bakerStr;
   int bakerId = threadArgs->bakerId;
-  // While loop with cond_wait for mitts.
+  struct timeval start_t, end_t;
+  double diff_t;
+  double currDuration;
+
   // If left baker || cautious baker
   if (threadArgs->bakerType == LEFT_HANDED || threadArgs->bakerType == CAUTIOUS)
   {
     printf("[%s %d] wants a left-handed mitt...\n", bakerStr, bakerId);
     pthread_mutex_lock(leftLock);
+    // Start
+    gettimeofday(&start_t, NULL);
+    //  While loop with cond_wait for mitts.
     while (*(threadArgs->numLeftMitts) == 0)
     {
+      // Start the timer
       pthread_cond_wait(putDownLeftMitt, leftLock);
+    }
+    // Stop
+    gettimeofday(&end_t, NULL);
+    // Get the wait time
+    currDuration = getDuration(start_t, end_t);
+    // Add to our total
+    threadArgs->waitTime += currDuration;
+    // Add to combined total for average calc
+    if (threadArgs->bakerType == LEFT_HANDED)
+    {
+      *(threadArgs->leftTotalWait) += currDuration;
+    }
+    else
+    {
+      *(threadArgs->cautiousTotalWait) += currDuration;
     }
     // Grab the mitt
     *(threadArgs->numLeftMitts) -= 1;
@@ -216,10 +269,28 @@ void grabMitts(void *args)
   {
     printf("[%s %d] wants a right-handed mitt...\n", bakerStr, bakerId);
     pthread_mutex_lock(rightLock);
+    // Start
+    gettimeofday(&start_t, NULL);
     while (*(threadArgs->numRightMitts) == 0)
     {
       pthread_cond_wait(putDownRightMitt, rightLock);
     }
+    // Stop
+    gettimeofday(&end_t, NULL);
+    // Get the wait time
+    currDuration = getDuration(start_t, end_t);
+    // Add to our total
+    threadArgs->waitTime += currDuration;
+    // Add to combined total for average calc
+    if (threadArgs->bakerType == RIGHT_HANDED)
+    {
+      *(threadArgs->rightTotalWait) += currDuration;
+    }
+    else
+    {
+      *(threadArgs->cautiousTotalWait) += currDuration;
+    }
+    // Grab the mitt.
     *(threadArgs->numRightMitts) -= 1;
     printf("[%s %d] has got a right-handed mitt...\n", bakerStr, bakerId);
     pthread_mutex_unlock(rightLock);
