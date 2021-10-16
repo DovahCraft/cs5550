@@ -61,7 +61,7 @@ int main(int argc, char **argv)
   /* Process command-line arguments */
   if (argc != 5)
   {
-    fprintf(stderr, "Usage: %s <# left-handed bakers> <# right-handed bakers> <# cautious bakers> <seed>\n", argv[0]);
+    printf("Usage: %s <# left-handed bakers> <# right-handed bakers> <# cautious bakers> <seed>\n", argv[0]);
     exit(1);
   }
 
@@ -74,7 +74,7 @@ int main(int argc, char **argv)
       (num_cautious_bakers < 1) ||
       (seed < 0))
   {
-    fprintf(stderr, "Invalid command-line arguments... Aborting\n");
+    printf("Invalid command-line arguments... Aborting\n");
     exit(1);
   }
 
@@ -111,7 +111,7 @@ int main(int argc, char **argv)
     if (currLeftId < num_left_handed_bakers)
     {
       threadArgs[i].bakerType = LEFT_HANDED;
-      threadArgs[i].bakerStr = "Left-handed Baker";
+      threadArgs[i].bakerStr = "Left-handed baker";
       threadArgs[i].bakerId = currLeftId;
       currLeftId++;
     }
@@ -119,7 +119,7 @@ int main(int argc, char **argv)
     else if (currRightId < num_right_handed_bakers)
     {
       threadArgs[i].bakerType = RIGHT_HANDED;
-      threadArgs[i].bakerStr = "Right-handed Baker";
+      threadArgs[i].bakerStr = "Right-handed baker";
       threadArgs[i].bakerId = currRightId;
       currRightId++;
     }
@@ -127,7 +127,7 @@ int main(int argc, char **argv)
     else
     {
       threadArgs[i].bakerType = CAUTIOUS;
-      threadArgs[i].bakerStr = "Cautious Baker";
+      threadArgs[i].bakerStr = "Cautious baker";
       threadArgs[i].bakerId = currCautiousId;
       currCautiousId++;
     }
@@ -137,7 +137,7 @@ int main(int argc, char **argv)
     threadArgs[i].putDownLeftMitt = &putDownLeftMitt;
     threadArgs[i].putDownRightMitt = &putDownRightMitt;
     // threadArgs[i]->bufferIndex = 0;
-    printArg(threadArgs[i]);
+    // printArg(threadArgs[i]);
   }
 
   // Create baker threads
@@ -164,7 +164,7 @@ int main(int argc, char **argv)
 void printArg(struct arguments args)
 {
   struct arguments threadArg = args;
-  fprintf(stderr, "Printing args for [%s %d]\n", threadArg.bakerStr, threadArg.bakerId);
+  printf("Printing args for [%s %d]\n", threadArg.bakerStr, threadArg.bakerId);
   printf("Val: %d\n", threadArg.bakerId);
 }
 
@@ -199,7 +199,7 @@ void grabMitts(void *args)
   // If left baker || cautious baker
   if (threadArgs->bakerType == LEFT_HANDED || threadArgs->bakerType == CAUTIOUS)
   {
-    fprintf(stderr, "[%s %d] wants a left-handed mitt...\n", bakerStr, bakerId);
+    printf("[%s %d] wants a left-handed mitt...\n", bakerStr, bakerId);
     pthread_mutex_lock(leftLock);
     while (*(threadArgs->numLeftMitts) == 0)
     {
@@ -207,21 +207,21 @@ void grabMitts(void *args)
     }
     // Grab the mitt
     *(threadArgs->numLeftMitts) -= 1;
-    fprintf(stderr, "[%s %d] has got a left-handed mitt...\n", bakerStr, bakerId);
+    printf("[%s %d] has got a left-handed mitt...\n", bakerStr, bakerId);
     pthread_mutex_unlock(leftLock);
   }
 
   // If right baker || cautious baker
   if (threadArgs->bakerType == RIGHT_HANDED || threadArgs->bakerType == CAUTIOUS)
   {
-    fprintf(stderr, "[%s %d] wants a right-handed mitt...\n", bakerStr, bakerId);
+    printf("[%s %d] wants a right-handed mitt...\n", bakerStr, bakerId);
     pthread_mutex_lock(rightLock);
     while (*(threadArgs->numRightMitts) == 0)
     {
       pthread_cond_wait(putDownRightMitt, rightLock);
     }
     *(threadArgs->numRightMitts) -= 1;
-    fprintf(stderr, "[%s %d] has got a right-handed mitt...\n", bakerStr, bakerId);
+    printf("[%s %d] has got a right-handed mitt...\n", bakerStr, bakerId);
     pthread_mutex_unlock(rightLock);
   }
 }
@@ -240,7 +240,7 @@ void putDownMitts(void *args)
     pthread_mutex_lock(leftLock);
     // Grab the mitt
     *(threadArgs->numLeftMitts) += 1;
-    fprintf(stderr, "[%s %d] has put back a left-handed mitt... \n", bakerStr, bakerId);
+    printf("[%s %d] has put back a left-handed mitt... \n", bakerStr, bakerId);
     pthread_cond_signal(putDownLeftMitt);
     pthread_mutex_unlock(leftLock);
   }
@@ -251,7 +251,7 @@ void putDownMitts(void *args)
     pthread_mutex_lock(rightLock);
     // Grab the mitt
     *(threadArgs->numRightMitts) += 1;
-    fprintf(stderr, "[%s %d] has put back a right-handed mitt... \n", bakerStr, bakerId);
+    printf("[%s %d] has put back a right-handed mitt... \n", bakerStr, bakerId);
     pthread_cond_signal(putDownRightMitt);
     pthread_mutex_unlock(rightLock);
   }
@@ -259,15 +259,15 @@ void putDownMitts(void *args)
 
 void prepareCookies(char *bakerStr, int bakerId)
 {
-  fprintf(stderr, "[%s %d] is working...\n", bakerStr, bakerId);
+  printf("[%s %d] is working...\n", bakerStr, bakerId);
   // Sleep (work) for .2 to .5 seconds
   random_sleep(.2, .5);
 }
 
 void waitForCookies(char *bakerStr, int bakerId)
 {
-  fprintf(stderr, "[%s %d] has put cookies in the oven and is waiting...\n", bakerStr, bakerId);
+  printf("[%s %d] has put cookies in the oven and is waiting...\n", bakerStr, bakerId);
   // Sleep (work) for .2 to .5 seconds
   random_sleep(.2, .5);
-  fprintf(stderr, "[%s %d] has taken cookies out of the oven...\n", bakerStr, bakerId);
+  printf("[%s %d] has taken cookies out of the oven...\n", bakerStr, bakerId);
 }
