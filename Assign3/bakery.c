@@ -15,7 +15,8 @@ struct arguments
   int *numLeftMitts;
   int *numRightMitts;
   int *numIterations;
-  pthread_cond_t *putDownMitts;
+  pthread_cond_t *putDownLeftMitt;
+  pthread_cond_t *putDownRightMitt;
   pthread_mutex_t *leftMutex;
   pthread_mutex_t *rightMutex;
   baker_type bakerType;
@@ -86,12 +87,14 @@ int main(int argc, char **argv)
   pthread_t baker_threads[totalBakers];
   struct arguments threadArgs[totalBakers];
   // Signals to check for mitts again instead of busy waiting.
-  pthread_cond_t putDownMitts;
+  pthread_cond_t putDownLeftMitt;
+  pthread_cond_t putDownRightMitt;
   // Not sure if this is needed.
   pthread_cond_t grabbedMitts;
   pthread_mutex_t leftLock;
   pthread_mutex_t rightLock;
-  pthread_cond_init(&putDownMitts, NULL);
+  pthread_cond_init(&putDownLeftMitt, NULL);
+  pthread_cond_init(&putDownRightMitt, NULL);
   pthread_mutex_init(&leftLock, NULL);
   pthread_mutex_init(&rightLock, NULL);
   int numLeftMitts = 3;
@@ -131,7 +134,8 @@ int main(int argc, char **argv)
     // Shared args
     threadArgs[i].numLeftMitts = &numLeftMitts;
     threadArgs[i].numRightMitts = &numRightMitts;
-    threadArgs[i].putDownMitts = &putDownMitts;
+    threadArgs[i].putDownLeftMitt = &putDownLeftMitt;
+    threadArgs[i].putDownRightMitt = &putDownRightMitt;
     // threadArgs[i]->bufferIndex = 0;
     printArg(threadArgs[i]);
   }
@@ -182,13 +186,13 @@ void *startBaking(void *args)
   }
 }
 
-// TODO: Check lock pointers n shit in args.
 void grabMitts(void *args)
 {
   struct arguments *threadArgs = (struct arguments *)args;
   pthread_mutex_t *leftLock = threadArgs->leftMutex;
   pthread_mutex_t *rightLock = threadArgs->rightMutex;
-  pthread_cond_t *putDownMitts = threadArgs->putDownMitts;
+  pthread_cond_t *putDownLeftMitt = threadArgs->putDownLeftMitt;
+  pthread_cond_t *putDownRightMitt = threadArgs->putDownRightMitt;
   char *bakerStr = threadArgs->bakerStr;
   int bakerId = threadArgs->bakerId;
   // While loop with cond_wait for mitts.
@@ -199,7 +203,7 @@ void grabMitts(void *args)
     pthread_mutex_lock(leftLock);
     while (*(threadArgs->numLeftMitts) == 0)
     {
-      pthread_cond_wait(putDownMitts, leftLock);
+      pthread_cond_wait(putDownLeftMitt, leftLock);
     }
     // Grab the mitt
     *(threadArgs->numLeftMitts) -= 1;
@@ -214,7 +218,7 @@ void grabMitts(void *args)
     pthread_mutex_lock(rightLock);
     while (*(threadArgs->numRightMitts) == 0)
     {
-      pthread_cond_wait(putDownMitts, rightLock);
+      pthread_cond_wait(putDownRightMitt, rightLock);
     }
     *(threadArgs->numRightMitts) -= 1;
     fprintf(stderr, "[%s %d] has got a right-handed mitt...\n", bakerStr, bakerId);
@@ -225,6 +229,32 @@ void grabMitts(void *args)
 void putDownMitts(void *args)
 {
   struct arguments *threadArgs = (struct arguments *)args;
+  pthread_mutex_t *leftLock = threadArgs->leftMutex;
+  pthread_mutex_t *rightLock = threadArgs->rightMutex;
+  pthread_cond_t *putDownLeftMitt = threadArgs->putDownLeftMitt;
+  pthread_cond_t *putDownRightMitt = threadArgs->putDownRightMitt;
+  char *bakerStr = threadArgs->bakerStr;
+  int bakerId = threadArgs->bakerId;
+  if (threadArgs->bakerType == LEFT_HANDED || threadArgs->bakerType == CAUTIOUS)
+  {
+    pthread_mutex_lock(leftLock);
+    // Grab the mitt
+    *(threadArgs->numLeftMitts) += 1;
+    fprintf(stderr, "[%s %d] has put back a left-handed mitt... \n", bakerStr, bakerId);
+    pthread_cond_signal(putDownLeftMitt);
+    pthread_mutex_unlock(leftLock);
+  }
+
+  // If right baker || cautious baker
+  if (threadArgs->bakerType == RIGHT_HANDED || threadArgs->bakerType == CAUTIOUS)
+  {
+    pthread_mutex_lock(rightLock);
+    // Grab the mitt
+    *(threadArgs->numRightMitts) += 1;
+    fprintf(stderr, "[%s %d] has put back a right-handed mitt... \n", bakerStr, bakerId);
+    pthread_cond_signal(putDownRightMitt);
+    pthread_mutex_unlock(rightLock);
+  }
 }
 
 void prepareCookies(char *bakerStr, int bakerId)
