@@ -44,11 +44,39 @@ int main(int argc, char *argv[])
 	data = (struct pointData *)malloc(sizeof(struct pointData) * N);
 	printf("\nSize of dataset (MiB): %f", (2.0 * sizeof(double) * N * 1.0) / (1024.0 * 1024.0));
 	generateDataset(data);
-
 	//change OpenMP settings:
-	omp_set_num_threads(6);
+	//omp_set_num_threads();
 
 	double tstart = omp_get_wtime();
+
+	int i, j = 0;
+
+//Begin optimized omp algo
+#pragma omp parallel shared(data, count) private(i, j)
+	{
+#pragma omp for reduction(+ \
+						  : count)
+		for (i = 0; i < N; i++)
+		{
+			count += 1;
+			for (j = i + 1; j < N; j++)
+			{
+				if (computeEuclidDist(&(data[i]), &(data[j])) <= epsilon)
+				{
+					count += 2;
+				}
+			}
+		}
+	}
+
+	double tend = omp_get_wtime();
+
+	printf("Count: %d", count);
+	printf("\nTotal time (s): %f", tend - tstart);
+
+	free(data);
+	printf("\n");
+	return 0;
 
 	//Write your code here:
 	//The data you need to use is stored in the variable "data",
@@ -65,9 +93,8 @@ int main(int argc, char *argv[])
 		}
 	}*/
 
-	int i, j = 0;
-//Begin BF with omp
-/*#pragma omp parallel shared(data, count) private(i, j)
+	//Begin BF with omp
+	/*#pragma omp parallel shared(data, count) private(i, j)
 	{
 #pragma omp for
 		for (i = 0; i < N; i++)
@@ -83,36 +110,6 @@ int main(int argc, char *argv[])
 			}
 		}
 	}*/
-
-//Begin optimized omp algo
-#pragma omp parallel shared(data, count) private(i, j)
-	{
-#pragma omp for reduction(+ \
-						  : count)
-		for (i = 0; i < N; i++)
-		{
-#pragma omp atomic
-			count += 1;
-			for (j = i + 1; j < N; j++)
-			{
-				if (computeEuclidDist(&(data[i]), &(data[j])) <= epsilon)
-				{
-#pragma omp atomic
-					count += 2;
-					printf("Found valid point pair! Count is now: %d\n", count);
-				}
-			}
-		}
-	}
-
-	double tend = omp_get_wtime();
-
-	printf("Count: %d", count);
-	printf("\nTotal time (s): %f", tend - tstart);
-
-	free(data);
-	printf("\n");
-	return 0;
 }
 
 double computeEuclidDist(struct pointData *p1, struct pointData *p2)
