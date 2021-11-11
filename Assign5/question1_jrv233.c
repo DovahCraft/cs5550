@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <stdbool.h>
 #include "omp.h"
 
 //N is 100000 for the submission. However, you may use a smaller value of testing/debugging.
@@ -22,6 +23,13 @@ struct pointData
 	double x;
 	double y;
 };
+
+struct pointNode
+{
+	struct pointData point;
+	struct pointNode *next;
+};
+
 double computeEuclidDist(struct pointData *p1, struct pointData *p2);
 void generateDataset(struct pointData *data);
 
@@ -48,6 +56,26 @@ int main(int argc, char *argv[])
 	//omp_set_num_threads();
 
 	double tstart = omp_get_wtime();
+
+	struct pointNode **bigFT = calloc((int)pow(ceil(1000 / epsilon), 2), sizeof(void *));
+
+	//Will be either 100 (e = 10) or 200 (e = 5)
+	int bucketCount = 1000 / epsilon;
+
+	for (int i = 0; i < N; i++)
+	{
+		int xBucketVal = data[i].x / epsilon;
+		int yBucketVal = data[i].y / epsilon;
+		int bucketIndex = yBucketVal * ceil(1000 / epsilon) + xBucketVal;
+
+		struct pointNode **nodeToAdd = &(bigFT[bucketIndex]);
+		for (; *nodeToAdd; nodeToAdd = &((*nodeToAdd)->next))
+		{
+		}
+		*nodeToAdd = malloc(sizeof(struct pointNode));
+		(*nodeToAdd)->point = data[i];
+		(*nodeToAdd)->next = NULL;
+	}
 
 	int i, j = 0;
 
