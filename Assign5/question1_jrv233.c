@@ -30,8 +30,9 @@ struct pointNode
 	struct pointNode *next;
 };
 
-double computeEuclidDist(struct pointData *p1, struct pointData *p2);
+double computeEuclidDist(struct pointData p1, struct pointData p2);
 void generateDataset(struct pointData *data);
+int checkBucket(const struct pointData currentPoint, struct pointNode *pointsToCheck, const int epsilon);
 
 int main(int argc, char *argv[])
 {
@@ -50,22 +51,27 @@ int main(int argc, char *argv[])
 	//generate dataset:
 	struct pointData *data;
 	data = (struct pointData *)malloc(sizeof(struct pointData) * N);
-	printf("\nSize of dataset (MiB): %f", (2.0 * sizeof(double) * N * 1.0) / (1024.0 * 1024.0));
+	printf("\nSize of dataset (MiB): %f ", (2.0 * sizeof(double) * N * 1.0) / (1024.0 * 1024.0));
 	generateDataset(data);
 	//change OpenMP settings:
 	//omp_set_num_threads();
 
 	double tstart = omp_get_wtime();
 
-	struct pointNode **bigFT = calloc((int)pow(ceil(1000 / epsilon), 2), sizeof(void *));
-
 	//Will be either 100 (e = 10) or 200 (e = 5)
-	int bucketCount = 1000 / epsilon;
+	int bucketCount = (int)ceil((1000 / epsilon)) + 1;
+
+	struct pointNode **bigFT = calloc(pow(bucketCount, 2), sizeof(void *));
 
 	for (int i = 0; i < N; i++)
 	{
-		int xBucketVal = data[i].x / epsilon;
-		int yBucketVal = data[i].y / epsilon;
+		double row = data[i].x;
+		double col = data[i].y;
+		int xBucketVal = row / epsilon;
+		int yBucketVal = (bucketCount - (col / epsilon)) - 1;
+
+		//int xBucketVal = data[i].x / epsilon;
+		//int yBucketVal = data[i].y / epsilon;
 		int bucketIndex = yBucketVal * ceil(1000 / epsilon) + xBucketVal;
 
 		struct pointNode **nodeToAdd = &(bigFT[bucketIndex]);
@@ -75,12 +81,51 @@ int main(int argc, char *argv[])
 		*nodeToAdd = malloc(sizeof(struct pointNode));
 		(*nodeToAdd)->point = data[i];
 		(*nodeToAdd)->next = NULL;
+		//fprintf(stderr, "Point %f, %f placed in bucket x: %d, y: %d, 1D: %d\n\n", row, col, xBucketVal, yBucketVal, bucketIndex);
 	}
 
-	int i, j = 0;
+	//thread this, reduce count or something
+	for (int i = 0; i < bucketCount * bucketCount; ++i)
+	{
+		struct pointNode *pointList = bigFT[i];
+		if (!pointList)
+			continue;
 
-//Begin optimized omp algo
-#pragma omp parallel shared(data, count) private(i, j)
+		//Check Row/Col
+		const int row = i / bucketCount;
+		const int col = i - row * bucketCount;
+		//Each point in bucket
+		for (; pointList; pointList = pointList->next)
+		{
+			count++;
+			//Check points within our own bucket
+			if (pointList->next)
+			{
+				count += checkBucket(pointList->point, pointList->next, epsilon);
+			}
+
+			//If the entry to the right is valid, and not null
+			if (col + 1 != bucketCount && bigFT[i + 1])
+			{
+				count += checkBucket(pointList->point, bigFT[i + 1], epsilon);
+			}
+
+			//If the entry below is valid, and not null
+			if (row + 1 != bucketCount && bigFT[i + bucketCount])
+			{
+				count += checkBucket(pointList->point, bigFT[i + bucketCount], epsilon);
+			}
+		}
+	}
+	double tend = omp_get_wtime();
+
+	printf("Count: %d", count);
+	printf("\nTotal time (s): %f", tend - tstart);
+
+	//int i, j = 0;
+
+	//Begin optimized omp algo
+	/*#pragma omp parallel shared(data, count) private(i, j)
 	{
 #pragma omp for reduction(+ \
 						  : count)
@@ -95,12 +140,7 @@ int main(int argc, char *argv[])
 				}
 			}
 		}
-	}
-
-	double tend = omp_get_wtime();
-
-	printf("Count: %d", count);
-	printf("\nTotal time (s): %f", tend - tstart);
+	}*/
 
 	free(data);
 	printf("\n");
@@ -109,40 +149,26 @@ int main(int argc, char *argv[])
 	//Write your code here:
 	//The data you need to use is stored in the variable "data",
 	//which is of type pointData
-	//Sequential dumb code of badness
-	/*for (int i = 0; i < N; i++)
-	{
-		for (int j = 0; j < N; j++)
-		{
-			if (computeEuclidDist(&(data[i]), &(data[j])) <= epsilon)
-			{
-				count++;
-			}
-		}
-	}*/
-
-	//Begin BF with omp
-	/*#pragma omp parallel shared(data, count) private(i, j)
-	{
-#pragma omp for
-		for (i = 0; i < N; i++)
-		{
-			for (j = 0; j < N; j++)
-			{
-				if (computeEuclidDist(&(data[i]), &(data[j])) <= epsilon)
-				{
-#pragma omp atomic
-					count++;
-					printf("Found valid point pair! Count is now: %d\n", count);
-				}
-			}
-		}
-	}*/
 }
 
-double computeEuclidDist(struct pointData *p1, struct pointData *p2)
+int checkBucket(const struct pointData currentPoint, struct pointNode *pointsToCheck, const int epsilon)
 {
-	return sqrt(pow((p1->x - p2->x), 2) + pow((p1->y - p2->y), 2));
+	int count = 0;
+	//Each point in bucket
+	for (; pointsToCheck; pointsToCheck = pointsToCheck->next)
+	{
+		if (computeEuclidDist(currentPoint, pointsToCheck->point) <= epsilon)
+		{
+			count += 2;
+		}
+	}
+
+	return count;
+}
+
+double computeEuclidDist(struct pointData p1, struct pointData p2)
+{
+	return sqrt(pow((p1.x - p2.x), 2) + pow((p1.y - p2.y), 2));
 }
 
 //Do not modify the dataset generator or you will get the wrong answer
