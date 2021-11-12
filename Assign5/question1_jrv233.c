@@ -14,7 +14,7 @@
 #include "omp.h"
 
 //N is 100000 for the submission. However, you may use a smaller value of testing/debugging.
-#define N 100000
+#define N 1000000
 //Do not change the seed, or your answer will not be correct
 #define SEED 72
 
@@ -32,7 +32,7 @@ struct pointNode
 
 double computeEuclidDist(struct pointData p1, struct pointData p2);
 void generateDataset(struct pointData *data);
-int checkBucket(const struct pointData currentPoint, struct pointNode *pointsToCheck, const int epsilon);
+int checkBucket(const struct pointData currentPoint, struct pointNode *pointsToCheck, const double epsilon);
 
 int main(int argc, char *argv[])
 {
@@ -65,14 +65,14 @@ int main(int argc, char *argv[])
 
 	for (int i = 0; i < N; i++)
 	{
-		double row = data[i].x;
-		double col = data[i].y;
-		int xBucketVal = row / epsilon;
-		int yBucketVal = (bucketCount - (col / epsilon)) - 1;
+		double col = data[i].x;
+		double row = data[i].y;
+		int xBucketVal = col / epsilon;
+		int yBucketVal = (bucketCount - (row / epsilon));
 
 		//int xBucketVal = data[i].x / epsilon;
 		//int yBucketVal = data[i].y / epsilon;
-		int bucketIndex = yBucketVal * ceil(1000 / epsilon) + xBucketVal;
+		int bucketIndex = yBucketVal * bucketCount + xBucketVal;
 
 		struct pointNode **nodeToAdd = &(bigFT[bucketIndex]);
 		for (; *nodeToAdd; nodeToAdd = &((*nodeToAdd)->next))
@@ -85,9 +85,15 @@ int main(int argc, char *argv[])
 	}
 
 	//thread this, reduce count or something
+	int i;
+	struct pointNode *pointList;
+	int row, col;
+
+	//#pragma omp parallel for private(i, pointList, row, col) shared(bucketCount) reduction(+ \
+																					   : count)
 	for (int i = 0; i < bucketCount * bucketCount; ++i)
 	{
-		struct pointNode *pointList = bigFT[i];
+		pointList = bigFT[i];
 		if (!pointList)
 			continue;
 
@@ -97,7 +103,7 @@ int main(int argc, char *argv[])
 		//Each point in bucket
 		for (; pointList; pointList = pointList->next)
 		{
-			count++;
+			count += 1;
 			//Check points within our own bucket
 			if (pointList->next)
 			{
@@ -114,6 +120,16 @@ int main(int argc, char *argv[])
 			if (row + 1 != bucketCount && bigFT[i + bucketCount])
 			{
 				count += checkBucket(pointList->point, bigFT[i + bucketCount], epsilon);
+			}
+			//If the entry diagonal is valid, and not null
+			if (row + 1 != bucketCount && col + 1 != bucketCount && bigFT[i + bucketCount + 1])
+			{
+				count += checkBucket(pointList->point, bigFT[i + bucketCount + 1], epsilon);
+			}
+			//If the entry up and to the right is valid, and not null
+			if (row - 1 != -1 && col + 1 != bucketCount && bigFT[i - bucketCount + 1])
+			{
+				count += checkBucket(pointList->point, bigFT[i - bucketCount + 1], epsilon);
 			}
 		}
 	}
@@ -151,7 +167,7 @@ int main(int argc, char *argv[])
 	//which is of type pointData
 }
 
-int checkBucket(const struct pointData currentPoint, struct pointNode *pointsToCheck, const int epsilon)
+int checkBucket(const struct pointData currentPoint, struct pointNode *pointsToCheck, const double epsilon)
 {
 	int count = 0;
 	//Each point in bucket

@@ -16,3 +16,10 @@ print(np.mean(bfOmp))
 
 bfOmpO3 = [13.135677,13.342474,13.564788]
 print(np.mean(bfOmpO3))
+
+
+
+millthreaded = [0.725988, 0.621599,0.634111]
+print(np.mean(millthreaded))
+millseq = [0.998772,1.011886,0.967961]
+print(np.mean(millseq))
