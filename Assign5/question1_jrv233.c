@@ -54,92 +54,9 @@ int main(int argc, char *argv[])
 	printf("\nSize of dataset (MiB): %f ", (2.0 * sizeof(double) * N * 1.0) / (1024.0 * 1024.0));
 	generateDataset(data);
 	//change OpenMP settings:
-	omp_set_num_threads(1);
+	omp_set_num_threads(12);
 
 	double tstart = omp_get_wtime();
-
-	//Will be either 101 (e = 10) or 201 (e = 5)
-	int bucketCount = (int)ceil((1000 / epsilon)) + 1;
-
-	struct pointNode **bucketList = calloc(pow(bucketCount, 2), sizeof(void *));
-
-	//Populate buckets with pointNode objects in linked lists
-	for (int i = 0; i < N; i++)
-	{
-		double col = data[i].x;
-		double row = data[i].y;
-		int xBucketVal = col / epsilon;
-		int yBucketVal = (bucketCount - (row / epsilon));
-		int bucketIndex = yBucketVal * bucketCount + xBucketVal;
-
-		struct pointNode **nodeToAdd = &(bucketList[bucketIndex]);
-
-		//Loop until we find a spot to place our node in the bucket
-		for (; *nodeToAdd; nodeToAdd = &((*nodeToAdd)->next))
-		{
-		}
-		*nodeToAdd = malloc(sizeof(struct pointNode));
-		(*nodeToAdd)->point = data[i];
-		(*nodeToAdd)->next = NULL;
-	}
-
-	//Init vars for omp loop
-	int i;
-	struct pointNode *pointList;
-	int row, col;
-
-//This loop and its conditions do index math to check each bin and its relevant neighbors in 1D space
-#pragma omp parallel for private(i, pointList, row, col) shared(bucketCount) reduction(+ \
-																					   : count)
-	for (int i = 0; i < bucketCount * bucketCount; ++i)
-	{
-		pointList = bucketList[i];
-		//For each bucket, check if it is empty
-		if (!pointList)
-			continue;
-
-		//If it is not empty, get its row and col vals
-		const int row = i / bucketCount;
-		const int col = i - row * bucketCount;
-		//Each point in bucket
-		for (; pointList; pointList = pointList->next)
-		{
-			count += 1;
-			//Check points within our own bucket
-			if (pointList->next)
-			{
-				count += checkBucket(pointList->point, pointList->next, epsilon);
-			}
-
-			//If the entry to the right is valid, and not null
-			if (col + 1 != bucketCount && bucketList[i + 1])
-			{
-				count += checkBucket(pointList->point, bucketList[i + 1], epsilon);
-			}
-
-			//If the entry below is valid, and not null
-			if (row + 1 != bucketCount && bucketList[i + bucketCount])
-			{
-				count += checkBucket(pointList->point, bucketList[i + bucketCount], epsilon);
-			}
-			//If the entry diagonal is valid, and not null
-			if (row + 1 != bucketCount && col + 1 != bucketCount && bucketList[i + bucketCount + 1])
-			{
-				count += checkBucket(pointList->point, bucketList[i + bucketCount + 1], epsilon);
-			}
-			//If the entry up and to the right is valid, and not null
-			if (row - 1 != -1 && col + 1 != bucketCount && bucketList[i - bucketCount + 1])
-			{
-				count += checkBucket(pointList->point, bucketList[i - bucketCount + 1], epsilon);
-			}
-		}
-	}
-	double tend = omp_get_wtime();
-
-	printf("Count: %lld", count);
-	printf("\nTotal time (s): %f", tend - tstart);
-
-	/*	double tstart = omp_get_wtime();
 	int i, j = 0;
 
 //Begin Brute force bad omp algo (Question 1)
@@ -162,27 +79,11 @@ int main(int argc, char *argv[])
 	double tend = omp_get_wtime();
 
 	printf("Count: %lld", count);
-	printf("\nTotal time (s): %f", tend - tstart);*/
+	printf("\nTotal time (s): %f", tend - tstart);
 
 	free(data);
 	printf("\n");
 	return 0;
-}
-
-int checkBucket(const struct pointData currentPoint, struct pointNode *pointsToCheck, const double epsilon)
-{
-	int count = 0;
-	//Each point in bucket, this is slower with parallelism due to thread overheads!
-	//#pragma omp parallel for private(currentPoint)
-	for (; pointsToCheck; pointsToCheck = pointsToCheck->next)
-	{
-		if (computeEuclidDist(currentPoint, pointsToCheck->point) <= epsilon)
-		{
-			count += 2;
-		}
-	}
-
-	return count;
 }
 
 double computeEuclidDist(struct pointData p1, struct pointData p2)
