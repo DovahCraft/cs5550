@@ -6,9 +6,12 @@ print(np.mean(shitcodeBF))
 print(len(shitcodeBF))
 
 
+
 O3code = [21.536613,21.482563,21.531244]
 print(np.mean(O3code))
 print(len(O3code))
+
+#shitcodeBFOmp
 
 
 bfOmp = [124.043543,125.279506,122.608346]
@@ -18,8 +21,15 @@ bfOmpO3 = [13.135677,13.342474,13.564788]
 print(np.mean(bfOmpO3))
 
 
+chadSequential = [0.067581, 0.061914,0.067798]
+print("Chad sequential: ", np.mean(chadSequential))
 
-millthreaded = [0.725988, 0.621599,0.634111]
-print(np.mean(millthreaded))
-millseq = [0.998772,1.011886,0.967961]
-print(np.mean(millseq))
+chadSequentialO3 = [0.012887, 0.013030,0.012778]
+print("Chad sequentialO3: ", np.mean(chadSequentialO3))
+
+
+chadParallel = [0.019157, 0.023363, 0.021550]
+print("Chad parallel: ", np.mean(chadParallel))
+
+chadParallelO3 = [0.009398, 0.010713, 0.011587]
+print("Chad parallelO3: ", np.mean(chadParallelO3))
