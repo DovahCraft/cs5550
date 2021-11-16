@@ -1,9 +1,9 @@
 import numpy as np
 
 
-shitcodeBF = [347.292239, 350.945302, 346.863862]
-print(np.mean(shitcodeBF))
-print(len(shitcodeBF))
+codeBF = [347.292239, 350.945302, 346.863862]
+print(np.mean(codeBF))
+print(len(codeBF))
 
 
 
